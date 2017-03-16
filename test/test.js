@@ -3,11 +3,12 @@ var assert = require('chai').assert;
 var astEqual = require('esprima-ast-equality');
 var toJsCode = require('../').toJsCode;
 
+
 describe('hbs to js', function () {
   it('should compile a simple string concatination', function () {
     astEqual(toJsCode('Hello {{{world}}}'), (
       function render (data1) {
-        return 'Hello ' + String(data1.world);
+        return 'Hello ' + String(data1['world']);
       }
     ).toString());
   });
@@ -15,15 +16,23 @@ describe('hbs to js', function () {
   it('should compile a string concatination', function () {
     astEqual(toJsCode('Hello {{world}}'), (
       function render (data1) {
-        return 'Hello ' + escape(data1.world);
+        return 'Hello ' + escape(data1['world']);
       }
     ).toString());
   });
 
-  it('should compile a wrapping concatination', function () {
+  it('should compile an unescaped variable', function () {
     astEqual(toJsCode('Hello {{{world}}}.'), (
       function render (data1) {
-        return 'Hello ' + String(data1.world) + '.';
+        return 'Hello ' + String(data1['world']) + '.';
+      }
+    ).toString());
+  });
+
+  it('should compile a variable with dashes', function () {
+    astEqual(toJsCode('Hello {{{first-name}}}.'), (
+      function render (data1) {
+        return 'Hello ' + String(data1['first-name']) + '.';
       }
     ).toString());
   });
@@ -31,7 +40,7 @@ describe('hbs to js', function () {
   it('should convert a variable to string', function () {
     astEqual(toJsCode('{{{world}}}'), (
       function render (data1) {
-        return String(data1.world);
+        return String(data1['world']);
       }
     ).toString());
   });
@@ -48,6 +57,14 @@ describe('hbs to js', function () {
     astEqual(toJsCode('Hello {{#helper x=1}}{{/helper}}'), (
       function render (data1) {
         return 'Hello ' + helper({x: 1 });
+      }
+    ).toString());
+  });
+
+  it('should compile a helper with dashes in the name', function () {
+    astEqual(toJsCode('Hello {{#a-helper x=1}}{{/a-helper}}'), (
+      function render (data1) {
+        return 'Hello ' + aHelper({x: 1 });
       }
     ).toString());
   });
@@ -71,7 +88,7 @@ describe('hbs to js', function () {
   it('should compile a helper call with variable arguments', function () {
     astEqual(toJsCode('Hello {{helper x=world}}'), (
       function render (data1) {
-        return 'Hello ' + helper({ x: data1.world });
+        return 'Hello ' + helper({ x: data1['world'] });
       }
     ).toString());
   });
@@ -79,7 +96,7 @@ describe('hbs to js', function () {
   it('should compile a helper call with variable child arguments', function () {
     astEqual(toJsCode('Hello {{helper x=world.name}}'), (
       function render (data1) {
-        return 'Hello ' + helper({ x: data1.world.name });
+        return 'Hello ' + helper({ x: data1['world']['name'] });
       }
     ).toString());
   });
@@ -101,7 +118,7 @@ describe('hbs to js', function () {
           fn: function (data2) {
             return 'world' + helper({}, {
               fn: function (data3) {
-                return ' from ' + String(data3.world);
+                return ' from ' + String(data3['world']);
               }
             });
           }
@@ -117,7 +134,7 @@ describe('hbs to js', function () {
           fn: function (data2) {
             return 'world' + helper({}, {
               fn: function (data3) {
-                return ' from ' + String(data1.world);
+                return ' from ' + String(data1['world']);
               }
             });
           }
@@ -131,14 +148,23 @@ describe('hbs to js', function () {
     const code = toJsCode('Hello {{helper x=world}}', { export: true, helperResolver: (helperName) => helperMap[helperName]});
     assert.equal(code, `import { helper } from 'demo/helper';
 export function render(data1) {
-    return 'Hello ' + helper({ x: data1.world });
+    return 'Hello ' + helper({ x: data1['world'] });
+}`);
+  });
+
+  it('should compile a helper call amd add import statements', function () {
+    const helperMap = { helper: 'demo/helper' };
+    const code = toJsCode('Hello {{name}}', { export: true, helperResolver: (helperName) => helperMap[helperName]});
+    assert.equal(code, `import escape from 'lodash.escape';
+export function render(data1) {
+    return 'Hello ' + escape(data1['name']);
 }`);
   });
 
   it('should compile a unless call', function () {
     astEqual(toJsCode('Hello {{#unless online}}world{{/unless}}'), (
       function render (data1) {
-        return 'Hello ' + (data1.online ? '' : 'world');
+        return 'Hello ' + (data1['online'] ? '' : 'world');
       }
     ).toString());
   });
@@ -146,7 +172,7 @@ export function render(data1) {
   it('should compile a unless/else call', function () {
     astEqual(toJsCode('Hello {{#unless online}}world{{else}}mars{{/unless}}'), (
       function render (data1) {
-        return 'Hello ' + (data1.online ? 'mars' : 'world');
+        return 'Hello ' + (data1['online'] ? 'mars' : 'world');
       }
     ).toString());
   });
@@ -154,7 +180,7 @@ export function render(data1) {
   it('should compile a if call', function () {
     astEqual(toJsCode('Hello {{#if online}}world{{/if}}'), (
       function render (data1) {
-        return 'Hello ' + (data1.online ? 'world' : '');
+        return 'Hello ' + (data1['online'] ? 'world' : '');
       }
     ).toString());
   });
@@ -162,7 +188,7 @@ export function render(data1) {
   it('should compile a if/else call', function () {
     astEqual(toJsCode('Hello {{#if online}}world{{else}}moon{{/if}}'), (
       function render (data1) {
-        return 'Hello ' + (data1.online ? 'world' : 'moon');
+        return 'Hello ' + (data1['online'] ? 'world' : 'moon');
       }
     ).toString());
   });
@@ -170,7 +196,7 @@ export function render(data1) {
   it('should compile a if/else if call', function () {
     astEqual(toJsCode('Hello {{#if online}}world{{else if offline}}moon{{/if}}'), (
       function render (data1) {
-        return 'Hello ' + (data1.online ? 'world' : (data1.offline ? 'moon' : ''));
+        return 'Hello ' + (data1['online'] ? 'world' : (data1['offline'] ? 'moon' : ''));
       }
     ).toString());
   });
@@ -178,7 +204,7 @@ export function render(data1) {
   it('should compile a if/else if else call', function () {
     astEqual(toJsCode('Hello {{#if online}}world{{else if offline}}moon{{else}}mars{{/if}}'), (
       function render (data1) {
-        return 'Hello ' + (data1.online ? 'world' : (data1.offline ? 'moon' : 'mars'));
+        return 'Hello ' + (data1['online'] ? 'world' : (data1['offline'] ? 'moon' : 'mars'));
       }
     ).toString());
   });
