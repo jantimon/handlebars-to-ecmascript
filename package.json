@@ -1,6 +1,6 @@
 {
   "name": "handlebars-to-ecmascript",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Precompile templates to pure ecmascript",
   "main": "index.js",
   "keywords": [
@@ -8,7 +8,8 @@
     "ejs"
   ],
   "files": [
-    "index.js"
+    "index.js",
+    "lib/ejs-visitor.js"
   ],
   "scripts": {
     "posttest": "semistandard",
